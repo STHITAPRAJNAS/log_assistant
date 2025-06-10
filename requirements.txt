@@ -1,9 +1,9 @@
 # Core LangGraph and AI dependencies
 langgraph>=0.2.0
-langgraph-supervisor>=0.1.0
 langchain>=0.3.0
 langchain-aws>=0.2.0
 langchain-community>=0.3.0
+langchain-core>=0.3.0
 
 # Splunk SDK
 splunk-sdk>=2.0.0
