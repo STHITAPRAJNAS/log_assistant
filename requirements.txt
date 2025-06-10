@@ -1,0 +1,35 @@
+# Core LangGraph and AI dependencies
+langgraph>=0.2.0
+langgraph-supervisor>=0.1.0
+langchain>=0.3.0
+langchain-aws>=0.2.0
+langchain-community>=0.3.0
+
+# Splunk SDK
+splunk-sdk>=2.0.0
+
+# Vector store and embeddings
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.2
+
+# Data processing and visualization
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.17.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Streamlit UI
+streamlit>=1.28.0
+streamlit-option-menu>=0.3.6
+streamlit-plotly-events>=0.3.1
+
+# AWS Bedrock
+boto3>=1.29.0
+botocore>=1.32.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+typing-extensions>=4.8.0
+asyncio>=3.4.3 
