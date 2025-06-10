@@ -1,211 +1,149 @@
 #!/usr/bin/env python3
-"""Startup script for LogDetective Workflow Edition."""
+"""Simplified startup script for LogDetective Workflow."""
 
 import sys
-import os
 import subprocess
-import time
 from pathlib import Path
 
 def check_dependencies():
-    """Check if all required dependencies are installed."""
+    """Check core dependencies."""
     print("🔍 Checking dependencies...")
     
-    required_packages = [
-        'streamlit',
-        'langgraph',
-        'langchain',
-        'langchain-aws',
-        'splunklib',
-        'pandas',
-        'plotly',
-        'faiss-cpu',
-        'boto3'
+    required = [
+        'streamlit', 'langgraph', 'langchain', 'langchain-aws',
+        'splunklib', 'pandas', 'plotly', 'faiss-cpu', 'boto3'
     ]
     
-    missing_packages = []
-    
-    for package in required_packages:
+    missing = []
+    for pkg in required:
         try:
-            __import__(package.replace('-', '_'))
-            print(f"  ✅ {package}")
+            __import__(pkg.replace('-', '_'))
+            print(f"  ✅ {pkg}")
         except ImportError:
-            missing_packages.append(package)
-            print(f"  ❌ {package}")
+            missing.append(pkg)
+            print(f"  ❌ {pkg}")
     
-    if missing_packages:
-        print(f"\n❌ Missing packages: {', '.join(missing_packages)}")
-        print("Install them with: pip install -r requirements.txt")
+    if missing:
+        print(f"\n❌ Missing: {', '.join(missing)}")
+        print("Install with: pip install -r requirements.txt")
         return False
     
-    print("✅ All dependencies satisfied!")
+    print("✅ All dependencies OK!")
     return True
 
-def check_configuration():
-    """Check if configuration is properly set up."""
+def check_config():
+    """Check configuration."""
     print("\n🔧 Checking configuration...")
-    
-    # Check for config file
-    if not Path("config.py").exists():
-        print("❌ config.py not found")
-        return False
     
     try:
         from config import settings
         
-        # Check required settings
-        required_settings = [
-            'bedrock_model_id',
-            'aws_default_region',
-            'splunk_host',
-            'splunk_port',
-            'splunk_username'
+        checks = [
+            ('bedrock_model_id', getattr(settings, 'bedrock_model_id', None)),
+            ('aws_default_region', getattr(settings, 'aws_default_region', None)),
+            ('splunk_host', getattr(settings, 'splunk_host', None)),
+            ('splunk_username', getattr(settings, 'splunk_username', None))
         ]
         
-        for setting in required_settings:
-            if hasattr(settings, setting):
-                value = getattr(settings, setting)
-                if value:
-                    print(f"  ✅ {setting}: {value}")
-                else:
-                    print(f"  ⚠️  {setting}: Not set")
+        for name, value in checks:
+            if value:
+                print(f"  ✅ {name}: {value}")
             else:
-                print(f"  ❌ {setting}: Missing")
+                print(f"  ⚠️  {name}: Not set")
         
         print("✅ Configuration loaded!")
         return True
         
     except Exception as e:
-        print(f"❌ Configuration error: {e}")
+        print(f"❌ Config error: {e}")
         return False
 
-def initialize_knowledge_store():
-    """Initialize the knowledge store."""
-    print("\n📚 Initializing knowledge store...")
+def test_systems():
+    """Test system components."""
+    print("\n🧪 Testing systems...")
     
     try:
-        from knowledge_store import knowledge_store
-        
-        # Try to search for a test query
-        docs = knowledge_store.search("test", k=1)
-        print(f"✅ Knowledge store initialized with {len(docs)} documents")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Knowledge store error: {e}")
-        return False
-
-def test_workflow():
-    """Test the workflow system."""
-    print("\n🧪 Testing workflow system...")
-    
-    try:
+        # Test workflow
         from logdetective_workflow import log_detective_workflow
-        
-        # Get workflow info
         info = log_detective_workflow.get_workflow_info()
-        print(f"✅ Workflow initialized with {len(info['nodes'])} nodes")
+        print(f"✅ Workflow ready ({len(info['nodes'])} nodes)")
         
-        # Test with a simple query (without actually executing)
-        print("✅ Workflow system ready!")
+        # Test knowledge store
+        from knowledge_store import knowledge_store
+        docs = knowledge_store.search("test", k=1)
+        print(f"✅ Knowledge store ready ({len(docs)} docs)")
+        
+        # Test Splunk (optional)
+        try:
+            from splunk_tools import splunk_connector
+            if splunk_connector.test_connection():
+                print("✅ Splunk connected")
+            else:
+                print("⚠️  Splunk connection failed")
+        except:
+            print("⚠️  Splunk test failed")
+        
         return True
         
     except Exception as e:
-        print(f"❌ Workflow test failed: {e}")
-        return False
-
-def test_splunk_connection():
-    """Test Splunk connection."""
-    print("\n🔗 Testing Splunk connection...")
-    
-    try:
-        from splunk_tools import splunk_connector
-        
-        # Test connection
-        if splunk_connector.test_connection():
-            print("✅ Splunk connection successful!")
-            
-            # Test field discovery
-            fields = splunk_connector.get_index_fields()
-            print(f"✅ Found {len(fields)} fields in index 104118")
-            
-            return True
-        else:
-            print("⚠️  Splunk connection failed - check credentials")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Splunk connection error: {e}")
+        print(f"❌ System test failed: {e}")
         return False
 
 def start_streamlit():
-    """Start the Streamlit application."""
-    print("\n🚀 Starting LogDetective Workflow Edition...")
+    """Start Streamlit app."""
+    print("\n🚀 Starting LogDetective...")
     
-    # Check if streamlit app exists
     if not Path("streamlit_app_workflow.py").exists():
         print("❌ streamlit_app_workflow.py not found")
         return False
     
     try:
-        # Start Streamlit
         print("🌐 Starting Streamlit server...")
         print("📱 App will be available at: http://localhost:8501")
-        print("⏹️  Press Ctrl+C to stop the server")
+        print("⏹️  Press Ctrl+C to stop")
         
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", 
             "streamlit_app_workflow.py",
             "--server.headless", "false",
-            "--server.port", "8501",
-            "--browser.gatherUsageStats", "false"
+            "--server.port", "8501"
         ])
         
     except KeyboardInterrupt:
-        print("\n⏹️  Shutting down LogDetective...")
+        print("\n⏹️  Shutting down...")
     except Exception as e:
-        print(f"❌ Failed to start Streamlit: {e}")
+        print(f"❌ Failed to start: {e}")
         return False
 
 def main():
     """Main startup function."""
     print("🔍 " + "="*50)
-    print("🚀 LogDetective Workflow Edition Startup")
+    print("🚀 LogDetective Workflow Startup")
     print("="*52)
     
-    # Run all checks
+    # Run checks
     checks = [
         ("Dependencies", check_dependencies),
-        ("Configuration", check_configuration),
-        ("Knowledge Store", initialize_knowledge_store),
-        ("Workflow System", test_workflow),
-        ("Splunk Connection", test_splunk_connection)
+        ("Configuration", check_config),
+        ("Systems", test_systems)
     ]
     
-    failed_checks = []
-    
-    for check_name, check_func in checks:
+    failed = []
+    for name, check_func in checks:
         if not check_func():
-            failed_checks.append(check_name)
-            print(f"\n⚠️  {check_name} check failed")
-        else:
-            print(f"\n✅ {check_name} check passed")
+            failed.append(name)
     
-    if failed_checks:
-        print(f"\n❌ Some checks failed: {', '.join(failed_checks)}")
-        print("Please fix the issues before starting the application.")
-        
-        # Ask if user wants to continue anyway
-        response = input("\nDo you want to continue anyway? (y/N): ")
+    if failed:
+        print(f"\n❌ Failed checks: {', '.join(failed)}")
+        response = input("\nContinue anyway? (y/N): ")
         if response.lower() != 'y':
             print("Startup cancelled.")
             return
     
     print("\n" + "="*52)
-    print("🎉 All systems ready!")
+    print("🎉 System ready!")
     print("="*52)
     
-    # Start the application
     start_streamlit()
 
 if __name__ == "__main__":

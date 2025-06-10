@@ -1,4 +1,4 @@
-"""Modern Streamlit interface for LogDetective workflow system."""
+"""Simplified Streamlit interface for LogDetective workflow."""
 
 import streamlit as st
 import pandas as pd
@@ -7,232 +7,147 @@ import plotly.express as px
 from datetime import datetime
 import json
 import time
-from typing import Dict, Any
 
 from logdetective_workflow import log_detective_workflow
 from config import settings
 
 # Page configuration
 st.set_page_config(
-    page_title="LogDetective - Workflow Edition",
+    page_title="LogDetective Workflow",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for modern UI
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
+        padding: 2rem;
         border-radius: 10px;
-        margin-bottom: 2rem;
         color: white;
         text-align: center;
+        margin-bottom: 2rem;
     }
     
-    .workflow-status {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .node-success {
-        background: #d4edda;
-        border-color: #c3e6cb;
-        color: #155724;
-    }
-    
-    .node-error {
-        background: #f8d7da;
-        border-color: #f5c6cb;
-        color: #721c24;
-    }
-    
-    .node-running {
-        background: #d1ecf1;
-        border-color: #bee5eb;
-        color: #0c5460;
-    }
-    
-    .metrics-container {
+    .metric-card {
         background: white;
         padding: 1rem;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 1rem 0;
+        text-align: center;
     }
     
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    
-    .conversation-history {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
-        max-height: 400px;
-        overflow-y: auto;
-    }
+    .success { color: #28a745; }
+    .error { color: #dc3545; }
+    .warning { color: #ffc107; }
 </style>
 """, unsafe_allow_html=True)
 
 
 def initialize_session_state():
-    """Initialize Streamlit session state."""
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = []
-    if 'current_execution' not in st.session_state:
-        st.session_state.current_execution = None
-    if 'workflow_info' not in st.session_state:
-        st.session_state.workflow_info = log_detective_workflow.get_workflow_info()
-    if 'system_status' not in st.session_state:
-        st.session_state.system_status = {}
+    """Initialize session state variables."""
+    if 'query_history' not in st.session_state:
+        st.session_state.query_history = []
+    if 'current_result' not in st.session_state:
+        st.session_state.current_result = None
 
 
 def render_header():
     """Render the main header."""
-    st.title("🔍 LogDetective - Workflow Edition")
-    st.markdown("*Sophisticated LangGraph-powered Splunk log analysis with fault tolerance*")
+    st.markdown("""
+    <div class="main-header">
+        <h1>🔍 LogDetective</h1>
+        <p>AI-Powered Splunk Log Analysis with LangGraph Workflow</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def render_sidebar():
-    """Render the sidebar with system information."""
-    st.sidebar.title("🎛️ System Status")
+    """Render sidebar with system information."""
+    st.sidebar.title("🎛️ System Info")
     
-    # Workflow information
-    with st.sidebar.expander("📊 Workflow Info", expanded=True):
-        workflow_info = st.session_state.workflow_info
-        st.write(f"**Nodes:** {len(workflow_info['nodes'])}")
-        st.write(f"**Max Retries:** {workflow_info['fault_tolerance']['max_retries_per_node']}")
-        st.write(f"**Recovery Attempts:** {workflow_info['fault_tolerance']['max_recovery_attempts']}")
-        
-        st.write("**Capabilities:**")
-        for capability in workflow_info['capabilities']:
-            st.write(f"• {capability}")
+    # Workflow info
+    with st.sidebar.expander("📊 Workflow Details", expanded=True):
+        info = log_detective_workflow.get_workflow_info()
+        st.write(f"**Nodes:** {len(info['nodes'])}")
+        st.write("**Features:**")
+        for feature in info['features']:
+            st.write(f"• {feature}")
     
-    # System health check
-    with st.sidebar.expander("🔧 System Health", expanded=True):
-        if st.button("🔄 Check Connection"):
-            with st.spinner("Testing connections..."):
+    # System health
+    with st.sidebar.expander("🔧 Health Check"):
+        if st.button("🔄 Test Connections"):
+            with st.spinner("Testing..."):
                 try:
                     from splunk_tools import splunk_connector
-                    splunk_status = splunk_connector.test_connection()
-                    st.success("✅ Splunk Connected" if splunk_status else "❌ Splunk Disconnected")
+                    splunk_ok = splunk_connector.test_connection()
+                    st.success("✅ Splunk Connected" if splunk_ok else "❌ Splunk Failed")
                     
-                    # Test knowledge store
                     from knowledge_store import knowledge_store
                     docs = knowledge_store.search("test", k=1)
-                    st.success(f"✅ Knowledge Store ({len(docs)} docs available)")
+                    st.success(f"✅ Knowledge Base ({len(docs)} docs)")
                     
                 except Exception as e:
-                    st.error(f"❌ System Error: {str(e)}")
+                    st.error(f"❌ Error: {str(e)}")
     
-    # Configuration
-    with st.sidebar.expander("⚙️ Configuration"):
-        st.write(f"**AWS Region:** {settings.aws_default_region}")
-        st.write(f"**Bedrock Model:** {settings.bedrock_model_id}")
-        st.write(f"**Splunk Index:** 104118")
-        st.write(f"**Max Results:** 100")
-    
-    # Conversation history
-    with st.sidebar.expander("💬 Conversation History"):
-        if st.session_state.conversation_history:
-            for i, turn in enumerate(st.session_state.conversation_history[-5:]):  # Last 5
-                with st.container():
-                    st.write(f"**Q{i+1}:** {turn['user_query'][:50]}...")
-                    if turn.get('success'):
-                        st.success(f"✅ {turn.get('execution_time', 0):.1f}s")
-                    else:
-                        st.error("❌ Failed")
+    # Recent queries
+    with st.sidebar.expander("📚 Recent Queries"):
+        if st.session_state.query_history:
+            for i, query in enumerate(st.session_state.query_history[-5:]):
+                st.write(f"**{i+1}.** {query['user_query'][:30]}...")
+                if query.get('success'):
+                    st.write(f"<span class='success'>✅ {query.get('execution_time', 0):.1f}s</span>", 
+                           unsafe_allow_html=True)
+                else:
+                    st.write("<span class='error'>❌ Failed</span>", unsafe_allow_html=True)
+                st.divider()
         else:
-            st.info("No conversation history yet")
+            st.info("No recent queries")
 
 
 def render_query_interface():
     """Render the main query interface."""
-    st.subheader("💭 Query Interface")
+    st.subheader("💭 Ask LogDetective")
     
     # Sample queries
     sample_queries = [
         "Show me the top 10 hosts by event count",
-        "Find all error events in the last hour",
+        "Find all error events in the last hour", 
         "What are the most common log levels?",
-        "Show network traffic patterns by destination port",
-        "Find authentication failures by user",
-        "Show disk usage alerts over time"
+        "Show network traffic by destination port",
+        "Find authentication failures",
+        "Display disk usage alerts over time"
     ]
     
     col1, col2 = st.columns([3, 1])
     
     with col1:
         user_query = st.text_area(
-            "Enter your log analysis query:",
+            "Enter your question:",
             placeholder="e.g., Show me all error events in the last 24 hours",
-            height=100
+            height=100,
+            key="query_input"
         )
     
     with col2:
-        st.write("**Sample Queries:**")
+        st.write("**Quick Start:**")
         for query in sample_queries:
-            if st.button(query, key=f"sample_{hash(query)}"):
-                user_query = query
+            if st.button(query, key=f"sample_{hash(query)}", use_container_width=True):
+                st.session_state.query_input = query
                 st.experimental_rerun()
     
-    # Execution options
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        execution_mode = st.selectbox(
-            "Execution Mode:",
-            ["Standard", "Streaming", "Debug"],
-            help="Standard: Normal execution, Streaming: Real-time updates, Debug: Detailed logging"
-        )
-    
-    with col2:
-        include_visualization = st.checkbox("Include Charts", value=True)
-    
-    with col3:
-        max_results = st.number_input("Max Results", min_value=10, max_value=1000, value=100)
-    
-    return user_query, execution_mode, include_visualization, max_results
+    return user_query
 
 
-def execute_workflow(user_query: str, execution_mode: str):
-    """Execute the workflow and display results."""
+def execute_query(user_query: str):
+    """Execute query and show results."""
     if not user_query.strip():
         st.warning("Please enter a query")
         return
     
-    # Prepare conversation history
-    history = [
-        {
-            "role": "user",
-            "content": turn["user_query"]
-        }
-        for turn in st.session_state.conversation_history[-5:]  # Last 5 turns
-    ]
-    
-    if execution_mode == "Streaming":
-        execute_streaming_workflow(user_query, history)
-    else:
-        execute_standard_workflow(user_query, history, execution_mode == "Debug")
-
-
-def execute_standard_workflow(user_query: str, history: list, debug: bool = False):
-    """Execute standard workflow."""
-    start_time = time.time()
-    
-    # Create progress containers
+    # Progress tracking
     progress_container = st.container()
     results_container = st.container()
     
@@ -240,223 +155,139 @@ def execute_standard_workflow(user_query: str, history: list, debug: bool = Fals
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        status_text.text("🚀 Initializing workflow...")
-        progress_bar.progress(10)
+        status_text.text("🚀 Starting workflow...")
+        progress_bar.progress(20)
     
     try:
-        # Execute workflow
         with st.spinner("Processing your query..."):
-            result = log_detective_workflow.process_query(user_query, history)
+            # Execute the workflow
+            result = log_detective_workflow.process_query(user_query)
         
-        execution_time = time.time() - start_time
         progress_bar.progress(100)
-        status_text.text(f"✅ Completed in {execution_time:.2f}s")
+        status_text.text("✅ Query completed!")
+        
+        # Store result
+        st.session_state.current_result = result
+        st.session_state.query_history.append(result)
         
         # Display results
         with results_container:
-            display_workflow_results(result, debug)
-        
-        # Add to conversation history
-        result['execution_time'] = execution_time
-        result['timestamp'] = datetime.now().isoformat()
-        st.session_state.conversation_history.append(result)
-        
+            display_results(result)
+            
     except Exception as e:
         progress_bar.progress(100)
-        status_text.text("❌ Workflow failed")
-        st.error(f"Workflow execution failed: {str(e)}")
+        status_text.text("❌ Query failed")
+        st.error(f"Error: {str(e)}")
 
 
-def execute_streaming_workflow(user_query: str, history: list):
-    """Execute streaming workflow with real-time updates."""
-    st.subheader("🔄 Live Workflow Execution")
-    
-    # Create containers for streaming updates
-    progress_container = st.container()
-    nodes_container = st.container()
-    results_container = st.container()
-    
-    with progress_container:
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-    
-    node_statuses = {}
-    total_nodes = len(st.session_state.workflow_info['nodes'])
-    
-    try:
-        # Stream workflow execution
-        for i, chunk in enumerate(log_detective_workflow.stream_query(user_query, history)):
-            node_name = chunk.get("node", "unknown")
-            
-            # Update progress
-            progress = min(100, (i + 1) * 100 // total_nodes)
-            progress_bar.progress(progress)
-            status_text.text(f"🔄 Executing: {node_name}")
-            
-            # Update node status
-            node_statuses[node_name] = {
-                "status": "running" if "error" not in chunk else "error",
-                "timestamp": chunk.get("timestamp", ""),
-                "error": chunk.get("error")
-            }
-            
-            # Display node statuses
-            with nodes_container:
-                display_node_statuses(node_statuses)
-            
-            time.sleep(0.1)  # Brief pause for visual effect
-        
-        status_text.text("✅ Workflow completed")
-        
-        # Execute final workflow to get complete results
-        result = log_detective_workflow.process_query(user_query, history)
-        
-        with results_container:
-            display_workflow_results(result, False)
-        
-        # Add to conversation history
-        result['timestamp'] = datetime.now().isoformat()
-        st.session_state.conversation_history.append(result)
-        
-    except Exception as e:
-        status_text.text("❌ Streaming failed")
-        st.error(f"Streaming execution failed: {str(e)}")
-
-
-def display_node_statuses(node_statuses: Dict[str, Any]):
-    """Display current node execution statuses."""
-    st.write("**Node Execution Status:**")
-    
-    cols = st.columns(3)
-    for i, (node_name, status) in enumerate(node_statuses.items()):
-        col_idx = i % 3
-        
-        with cols[col_idx]:
-            status_class = f"node-{status['status']}"
-            
-            if status['status'] == 'running':
-                icon = "🔄"
-            elif status['status'] == 'error':
-                icon = "❌"
-            else:
-                icon = "✅"
-            
-            st.markdown(f"""
-            <div class="workflow-status {status_class}">
-                <strong>{icon} {node_name}</strong><br>
-                <small>{status['timestamp']}</small>
-            </div>
-            """, unsafe_allow_html=True)
-
-
-def display_workflow_results(result: Dict[str, Any], debug: bool = False):
-    """Display comprehensive workflow results."""
+def display_results(result):
+    """Display query results."""
     if not result.get('success'):
         st.error(f"❌ Query failed: {result.get('error', 'Unknown error')}")
         return
     
-    # Main response
-    st.subheader("📝 Analysis Results")
-    st.write(result['final_response'])
-    
-    # Metrics
+    # Header with key metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric(
-            "Execution Time",
-            f"{result.get('total_execution_time', 0):.2f}s",
-            help="Total workflow execution time"
-        )
+        st.metric("Execution Time", f"{result.get('execution_time', 0):.2f}s")
     
     with col2:
-        st.metric(
-            "Error Count",
-            result.get('error_count', 0),
-            help="Number of errors encountered"
-        )
+        status = "✅ Connected" if result.get('splunk_connected') else "❌ Disconnected"
+        st.metric("Splunk Status", status)
     
     with col3:
-        st.metric(
-            "Splunk Status",
-            "Connected" if result.get('splunk_connection_status') else "Disconnected",
-            help="Splunk connection status"
-        )
+        retries = result.get('retry_count', 0)
+        st.metric("Retries", retries)
     
     with col4:
-        st.metric(
-            "Nodes Executed",
-            len(result.get('execution_trace', [])),
-            help="Number of workflow nodes executed"
-        )
+        turn_id = result.get('turn_id', 'N/A')
+        st.metric("Turn ID", turn_id)
     
-    # SPL Query
+    # Analysis response
+    if result.get('analysis_response'):
+        st.subheader("📝 Analysis")
+        st.write(result['analysis_response'])
+    
+    # SPL query
     if result.get('spl_query'):
         st.subheader("🔍 Generated SPL Query")
         st.code(result['spl_query'], language='sql')
+        
+        if result.get('spl_explanation'):
+            st.info(f"**Explanation:** {result['spl_explanation']}")
     
-    # Data Results
-    data_results = result.get('data_results')
-    if data_results and data_results.get('success'):
-        display_data_results(data_results)
+    # Query results
+    query_results = result.get('query_results')
+    if query_results and query_results.get('success'):
+        display_data_results(query_results)
     
     # Visualization
     viz_config = result.get('visualization_config')
     if viz_config:
         display_visualization(viz_config)
     
-    # Debug information
-    if debug:
-        display_debug_info(result)
+    # Error details
+    if result.get('error_message'):
+        st.error(f"⚠️ Warning: {result['error_message']}")
 
 
-def display_data_results(data_results: Dict[str, Any]):
+def display_data_results(query_results):
     """Display query data results."""
-    st.subheader("📊 Query Results")
+    st.subheader("📊 Data Results")
     
-    results = data_results.get('results', [])
-    if not results:
-        st.info("No data returned from the query")
+    data = query_results.get('data', [])
+    if not data:
+        st.info("No data returned from query")
         return
     
-    # Convert to DataFrame
-    df = pd.DataFrame(results)
-    
-    # Display summary
+    # Summary
     col1, col2 = st.columns(2)
     with col1:
-        st.write(f"**Total Results:** {len(results)}")
-        st.write(f"**Fields:** {', '.join(df.columns.tolist())}")
+        st.write(f"**Results:** {len(data)} rows")
+        st.write(f"**Fields:** {len(query_results.get('fields', []))}")
     
     with col2:
-        stats = data_results.get('stats', {})
+        stats = query_results.get('stats', {})
         st.write(f"**Events Scanned:** {stats.get('scan_count', 0):,}")
-        st.write(f"**Query Runtime:** {stats.get('run_duration', 0):.2f}s")
+        st.write(f"**Query Time:** {stats.get('run_duration', 0):.2f}s")
     
-    # Display data table
+    # Data table
+    df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
     
     # Download option
-    csv = df.to_csv(index=False)
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv,
-        file_name=f"logdetective_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
+    if len(data) > 0:
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download CSV",
+            data=csv,
+            file_name=f"logdetective_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
 
 
-def display_visualization(viz_config: Dict[str, Any]):
-    """Display generated visualization."""
-    st.subheader("📈 Data Visualization")
+def display_visualization(viz_config):
+    """Display visualization."""
+    st.subheader("📈 Visualization")
     
     try:
         chart_config = viz_config.get('chart_config', {})
+        chart_data = chart_config.get('data', [])
         chart_type = chart_config.get('chart_type', 'bar')
         
-        if chart_type and chart_config.get('data'):
-            # Create plotly figure from config
-            fig = create_plotly_from_config(chart_config)
+        if chart_data:
+            df = pd.DataFrame(chart_data)
+            
+            if chart_type == 'bar':
+                fig = px.bar(df, x=df.columns[0], y=df.columns[1])
+            elif chart_type == 'line':
+                fig = px.line(df, x=df.columns[0], y=df.columns[1])
+            elif chart_type == 'pie':
+                fig = px.pie(df, names=df.columns[0], values=df.columns[1])
+            else:
+                fig = px.scatter(df, x=df.columns[0], y=df.columns[1])
+            
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No visualization data available")
@@ -465,60 +296,74 @@ def display_visualization(viz_config: Dict[str, Any]):
         st.error(f"Visualization error: {str(e)}")
 
 
-def create_plotly_from_config(chart_config: Dict[str, Any]) -> go.Figure:
-    """Create Plotly figure from chart configuration."""
-    chart_type = chart_config.get('chart_type', 'bar')
-    data = chart_config.get('data', [])
-    title = chart_config.get('title', 'Chart')
-    
-    df = pd.DataFrame(data)
-    
-    if chart_type == 'bar':
-        fig = px.bar(df, x=df.columns[0], y=df.columns[1], title=title)
-    elif chart_type == 'line':
-        fig = px.line(df, x=df.columns[0], y=df.columns[1], title=title)
-    elif chart_type == 'pie':
-        fig = px.pie(df, names=df.columns[0], values=df.columns[1], title=title)
-    else:
-        # Default to scatter
-        fig = px.scatter(df, x=df.columns[0], y=df.columns[1], title=title)
-    
-    return fig
-
-
-def display_debug_info(result: Dict[str, Any]):
-    """Display debug information."""
-    st.subheader("🐛 Debug Information")
-    
-    with st.expander("Execution Trace"):
-        trace = result.get('execution_trace', [])
-        st.write(f"Nodes executed: {trace}")
-    
-    with st.expander("Full Result Object"):
-        st.json(result)
-
-
 def main():
-    """Main application function."""
+    """Main application."""
     initialize_session_state()
     render_header()
     render_sidebar()
     
-    # Main interface
-    user_query, execution_mode, include_viz, max_results = render_query_interface()
+    # Main query interface
+    user_query = render_query_interface()
     
-    # Execute button
-    if st.button("🚀 Execute Query", type="primary"):
-        execute_workflow(user_query, execution_mode)
+    # Execution modes
+    col1, col2 = st.columns([2, 1])
     
-    # Display recent results
-    if st.session_state.conversation_history:
-        st.subheader("📚 Recent Analysis")
+    with col1:
+        if st.button("🚀 Execute Query", type="primary", use_container_width=True):
+            execute_query(user_query)
+    
+    with col2:
+        if st.button("🔄 Stream Execution", use_container_width=True):
+            stream_execution(user_query)
+    
+    # Display current result if available
+    if st.session_state.current_result:
+        st.divider()
+        st.subheader("📋 Current Results")
+        display_results(st.session_state.current_result)
+
+
+def stream_execution(user_query: str):
+    """Stream workflow execution."""
+    if not user_query.strip():
+        st.warning("Please enter a query")
+        return
+    
+    st.subheader("🔄 Live Execution Stream")
+    
+    # Create containers for streaming
+    status_container = st.container()
+    steps_container = st.container()
+    
+    with status_container:
+        status_placeholder = st.empty()
+    
+    try:
+        step_count = 0
+        for update in log_detective_workflow.stream_query(user_query):
+            step_count += 1
+            
+            with status_placeholder.container():
+                st.write(f"**Step {step_count}:** {update.get('step', 'unknown')}")
+                st.write(f"**Time:** {update.get('timestamp', '')}")
+            
+            with steps_container:
+                if update.get('error'):
+                    st.error(f"❌ Error in {update.get('step')}: {update.get('error')}")
+                else:
+                    st.success(f"✅ Completed: {update.get('step')}")
+            
+            time.sleep(0.5)  # Brief pause for visibility
         
-        # Show last result
-        latest_result = st.session_state.conversation_history[-1]
-        with st.expander(f"Latest: {latest_result['user_query'][:50]}...", expanded=True):
-            display_workflow_results(latest_result, False)
+        # Get final result
+        result = log_detective_workflow.process_query(user_query)
+        st.session_state.current_result = result
+        st.session_state.query_history.append(result)
+        
+        st.success("🎉 Streaming complete!")
+        
+    except Exception as e:
+        st.error(f"Streaming failed: {str(e)}")
 
 
 if __name__ == "__main__":
